@@ -7,9 +7,17 @@ import {
   writeTextFile,
 } from "@tauri-apps/plugin-fs";
 import * as xlsx from "xlsx";
+
+const RESULTS_DIRECTORY = "resultats";
+
+export async function maybeCreateResultsDirectory() {
+  if (!(await exists(RESULTS_DIRECTORY, { baseDir: BaseDirectory.Desktop })))
+    await mkdir(RESULTS_DIRECTORY, { baseDir: BaseDirectory.Desktop });
+}
+
 export async function convertExcelToText(filePath: string) {
   const filename = await basename(filePath);
-  const directory = `resultats/${filename.split(".")[0]}`;
+  const directory = `${RESULTS_DIRECTORY}/${filename.split(".")[0]}`;
 
   const contents = await readFile(filePath, {
     baseDir: BaseDirectory.Home,

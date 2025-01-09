@@ -1,25 +1,61 @@
 import {
   Button,
-  Callout,
   Code,
   Container,
   Flex,
   Heading,
   IconButton,
+  ScrollArea,
   Spinner,
   Text,
   Tooltip,
 } from "@radix-ui/themes";
-import { message, open } from "@tauri-apps/plugin-dialog";
-import { Download, File, FileSpreadsheet, Info } from "lucide-react";
-import { useState } from "react";
-import { convertExcelToText } from "./convertExcelToText";
+import { open } from "@tauri-apps/plugin-dialog";
+import {
+  Check,
+  Download,
+  FileSpreadsheet,
+  Files,
+  Trash2,
+  TriangleAlert,
+} from "lucide-react";
+import { useEffect, useState } from "react";
+import {
+  convertExcelToText,
+  maybeCreateResultsDirectory,
+} from "./convertExcelToText";
+
+type SelectedFile = {
+  path: string;
+  status: "pending" | "success" | "error" | "idle";
+};
+
+function resolveColorFromStatus(status: SelectedFile["status"]) {
+  switch (status) {
+    case "success":
+      return "green";
+    case "error":
+      return "red";
+
+    default:
+      return undefined;
+  }
+}
 
 export function App() {
-  const [selectedFile, setSelectedFile] = useState<string>("");
+  useEffect(() => {
+    (async () => {
+      await maybeCreateResultsDirectory();
+    })();
+  }, []);
+
+  const [selectedFiles, setSelectedFiles] = useState<
+    Record<string, SelectedFile>
+  >({});
+  const selectedFilesArray = Object.values(selectedFiles);
   const [converting, setConverting] = useState<boolean>(false);
   return (
-    <Container size={"1"} pt={"8"}>
+    <Container size={"2"} pt={"8"}>
       <Flex asChild direction={"column"} gap={"4"}>
         <main>
           <Flex asChild direction={"column"}>
@@ -37,35 +73,67 @@ export function App() {
             type="button"
             disabled={converting}
             onClick={openFileSelector}
-            variant={selectedFile ? "outline" : "solid"}
+            variant="soft"
           >
-            <File size={"1em"} />
-            {selectedFile ? "Changer le fichier" : "Sélectionner un fichier"}
+            <Files size={"1em"} />
+            {selectedFilesArray.length
+              ? "Sélectionner d'autres fichiers"
+              : "Sélectionner des fichiers"}
           </Button>
 
-          {selectedFile ? (
-            <Flex align={"center"} gap={"2"}>
-              <Tooltip content={selectedFile}>
-                <IconButton variant="ghost" radius="full">
-                  <FileSpreadsheet size={"1em"} />
-                </IconButton>
-              </Tooltip>
-              <Text title={selectedFile} className="truncate">
-                {selectedFile}
-              </Text>
-            </Flex>
-          ) : (
-            <Callout.Root>
-              <Callout.Icon>
-                <Info size={"1em"} />
-              </Callout.Icon>
-              <Callout.Text>
-                Vous n&apos;avez pas sélectionné de fichier à convertir
-              </Callout.Text>
-            </Callout.Root>
+          {selectedFilesArray.length > 0 && (
+            <ScrollArea
+              type="scroll"
+              scrollbars="vertical"
+              style={{ maxHeight: "500px", overscrollBehavior: "contain" }}
+            >
+              <Flex direction={"column"} gap={"4"}>
+                {selectedFilesArray.map(({ path: file, status }) => (
+                  <Flex align={"center"} gap={"2"} key={file}>
+                    {status === "idle" && (
+                      <IconButton
+                        variant="outline"
+                        color="red"
+                        size={"1"}
+                        mr={"2"}
+                        onClick={() => {
+                          setSelectedFiles((prev) => {
+                            const { [file]: _, ...rest } = prev;
+                            return rest;
+                          });
+                        }}
+                      >
+                        <Trash2 size={"0.75em"} />
+                      </IconButton>
+                    )}
+                    <Tooltip content={file}>
+                      <IconButton
+                        variant="ghost"
+                        radius="full"
+                        disabled={status === "pending"}
+                        color={resolveColorFromStatus(status)}
+                      >
+                        {status === "idle" && <FileSpreadsheet size={"1em"} />}
+                        {status === "success" && <Check size={"1em"} />}
+                        {status === "error" && <TriangleAlert size={"1em"} />}
+                        {status === "pending" && (
+                          <Spinner loading>
+                            <FileSpreadsheet size={"1em"} />
+                          </Spinner>
+                        )}
+                      </IconButton>
+                    </Tooltip>
+                    <Text title={file} className="truncate">
+                      {file}
+                    </Text>
+                  </Flex>
+                ))}
+              </Flex>
+            </ScrollArea>
           )}
-          {selectedFile && (
-            <Button disabled={converting} mt={"8"} onClick={convert}>
+
+          {selectedFilesArray.length > 0 && (
+            <Button disabled={converting} mt={"4"} onClick={convert}>
               <Spinner loading={converting}>
                 <Download size={"1em"} />
               </Spinner>
@@ -79,25 +147,44 @@ export function App() {
 
   async function convert() {
     setConverting(true);
-    try {
-      await convertExcelToText(selectedFile);
-      setSelectedFile("");
-      await message("Conversion terminée", { title: "Succès", kind: "info" });
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setConverting(false);
+    for (const { path } of selectedFilesArray) {
+      try {
+        setSelectedFiles((prev) => ({
+          ...prev,
+          [path]: { path, status: "pending" },
+        }));
+        await convertExcelToText(path);
+        setSelectedFiles((prev) => ({
+          ...prev,
+          [path]: { path, status: "success" },
+        }));
+      } catch (error) {
+        setSelectedFiles((prev) => ({
+          ...prev,
+          [path]: { path, status: "error" },
+        }));
+        console.error(error);
+      }
     }
+    setConverting(false);
   }
 
   async function openFileSelector() {
     const selected = await open({
-      multiple: false,
+      multiple: true,
       directory: false,
       filters: [{ extensions: ["xlsx"], name: "Excel" }],
     });
-    if (selected) {
-      setSelectedFile(selected);
+    if (selected && Array.isArray(selected)) {
+      setSelectedFiles(
+        selected.reduce(
+          (acc, path) => {
+            acc[path] = { path, status: "idle" };
+            return acc;
+          },
+          {} as Record<string, SelectedFile>,
+        ),
+      );
     }
   }
 }

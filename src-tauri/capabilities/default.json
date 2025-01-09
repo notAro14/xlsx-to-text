@@ -14,11 +14,17 @@
     },
     {
       "identifier": "fs:allow-mkdir",
-      "allow": [{ "path": "$DESKTOP/resultats/*" }]
+      "allow": [
+        { "path": "$DESKTOP/resultats/*" },
+        { "path": "$DESKTOP/resultats" }
+      ]
     },
     {
       "identifier": "fs:allow-exists",
-      "allow": [{ "path": "$DESKTOP/resultats/**" }]
+      "allow": [
+        { "path": "$DESKTOP/resultats/**" },
+        { "path": "$DESKTOP/resultats" }
+      ]
     }
   ]
 }
