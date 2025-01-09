@@ -21,26 +21,11 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import {
+  type SelectedFile,
   convertExcelToText,
   maybeCreateResultsDirectory,
-} from "./convertExcelToText";
-
-type SelectedFile = {
-  path: string;
-  status: "pending" | "success" | "error" | "idle";
-};
-
-function resolveColorFromStatus(status: SelectedFile["status"]) {
-  switch (status) {
-    case "success":
-      return "green";
-    case "error":
-      return "red";
-
-    default:
-      return undefined;
-  }
-}
+  resolveColorFromStatus,
+} from "./utils";
 
 export function App() {
   useEffect(() => {

@@ -10,6 +10,23 @@ import * as xlsx from "xlsx";
 
 const RESULTS_DIRECTORY = "resultats";
 
+export type SelectedFile = {
+  path: string;
+  status: "pending" | "success" | "error" | "idle";
+};
+
+export function resolveColorFromStatus(status: SelectedFile["status"]) {
+  switch (status) {
+    case "success":
+      return "green";
+    case "error":
+      return "red";
+
+    default:
+      return undefined;
+  }
+}
+
 export async function maybeCreateResultsDirectory() {
   if (!(await exists(RESULTS_DIRECTORY, { baseDir: BaseDirectory.Desktop })))
     await mkdir(RESULTS_DIRECTORY, { baseDir: BaseDirectory.Desktop });
