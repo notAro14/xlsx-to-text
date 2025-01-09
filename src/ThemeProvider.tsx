@@ -8,7 +8,6 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (themeRef.current) {
-      console.log(themeRef.current.classList);
       themeRef.current.className = isDark
         ? "dark radix-themes"
         : "light radix-themes";
